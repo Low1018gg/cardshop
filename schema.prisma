@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  FULFILLING
+  FULFILLED
+  CANCELLED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  role      String   @default("MERCHANT")
+  createdAt DateTime @default(now())
+  products  Product[]
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  merchantId  String
+  merchant    User     @relation(fields: [merchantId], references: [id])
+  title       String
+  description String?
+  priceUsdt   Decimal  @db.Decimal(18, 8)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  codes       Code[]
+  orders      Order[]
+}
+
+model Code {
+  id         String   @id @default(cuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id])
+
+  value      String
+  isUsed     Boolean  @default(false)
+  usedAt     DateTime?
+  orderId    String?  @unique
+  order      Order?   @relation(fields: [orderId], references: [id])
+
+  createdAt  DateTime @default(now())
+
+  @@index([productId, isUsed])
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  productId     String
+  product       Product     @relation(fields: [productId], references: [id])
+
+  buyerEmail    String
+  quantity      Int         @default(1)
+  amountUsdt    Decimal     @db.Decimal(18, 8)
+  status        OrderStatus @default(PENDING_PAYMENT)
+
+  provider      String?
+  invoiceId     String?     @unique
+  txHash        String?
+
+  createdAt     DateTime    @default(now())
+  fulfilledAt   DateTime?
+
+  codes         Code[]
+  @@index([status, createdAt])
+}
